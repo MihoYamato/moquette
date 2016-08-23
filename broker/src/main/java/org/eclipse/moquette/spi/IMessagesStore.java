@@ -99,4 +99,6 @@ public interface IMessagesStore {
     PublishEvent retrieveQoS2Message(String publishKey);
 
     void cleanRetained(String topic);
+    
+    int size();
 }

@@ -106,18 +106,18 @@ public class NettyAcceptor implements ServerAcceptor {
         m_workerGroup = new NioEventLoopGroup();
         
         initializePlainTCPTransport(messaging, props);
-        initializeWebSocketTransport(messaging, props);
-        String sslTcpPortProp = props.getProperty(Constants.SSL_PORT_PROPERTY_NAME);
-        String wssPortProp = props.getProperty(Constants.WSS_PORT_PROPERTY_NAME);
-        if (sslTcpPortProp != null || wssPortProp != null) {
-            SslHandlerFactory sslHandlerFactory = initSSLHandlerFactory(props);
-            if (!sslHandlerFactory.canCreate()) {
-                LOG.error("Can't initialize SSLHandler layer! Exiting, check your configuration of jks");
-                return;
-            }
-            initializeSSLTCPTransport(messaging, props, sslHandlerFactory);
-            initializeWSSTransport(messaging, props, sslHandlerFactory);
-        }
+//        initializeWebSocketTransport(messaging, props);
+//        String sslTcpPortProp = props.getProperty(Constants.SSL_PORT_PROPERTY_NAME);
+//        String wssPortProp = props.getProperty(Constants.WSS_PORT_PROPERTY_NAME);
+//        if (sslTcpPortProp != null || wssPortProp != null) {
+//            SslHandlerFactory sslHandlerFactory = initSSLHandlerFactory(props);
+//            if (!sslHandlerFactory.canCreate()) {
+//                LOG.error("Can't initialize SSLHandler layer! Exiting, check your configuration of jks");
+//                return;
+//            }
+//            initializeSSLTCPTransport(messaging, props, sslHandlerFactory);
+//            initializeWSSTransport(messaging, props, sslHandlerFactory);
+//        }
     }
 
     private void initFactory(String host, int port, final PipelineInitializer pipeliner) {

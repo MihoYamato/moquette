@@ -15,6 +15,8 @@
  */
 package org.eclipse.moquette.interception;
 
+import java.util.Set;
+
 import org.eclipse.moquette.interception.messages.InterceptConnectMessage;
 import org.eclipse.moquette.interception.messages.InterceptDisconnectMessage;
 import org.eclipse.moquette.interception.messages.InterceptPublishMessage;
@@ -22,6 +24,7 @@ import org.eclipse.moquette.interception.messages.InterceptSubscribeMessage;
 import org.eclipse.moquette.interception.messages.InterceptUnsubscribeMessage;
 import org.eclipse.moquette.proto.messages.*;
 import org.eclipse.moquette.spi.impl.subscriptions.Subscription;
+import org.eclipse.moquette.spi.impl.ProtocolProcessor;
 
 /**
  * This interface is used to inject code for intercepting broker events.
@@ -40,10 +43,14 @@ public interface InterceptHandler {
     void onConnect(InterceptConnectMessage msg);
 
     void onDisconnect(InterceptDisconnectMessage msg);
+    
+    void onDisconnect(InterceptDisconnectMessage msg, Set<String>deletedTopics);
 
     void onPublish(InterceptPublishMessage msg);
 
     void onSubscribe(InterceptSubscribeMessage msg);
 
     void onUnsubscribe(InterceptUnsubscribeMessage msg);
+
+	void onInit(ProtocolProcessor pp);
 }

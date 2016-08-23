@@ -61,7 +61,7 @@ import org.slf4j.LoggerFactory;
  * 
  * @author andrea
  */
-class ProtocolProcessor implements EventHandler<ValueEvent> {
+public class ProtocolProcessor implements EventHandler<ValueEvent> {
 
     static final class WillMessage {
         private final String topic;
@@ -111,6 +111,9 @@ class ProtocolProcessor implements EventHandler<ValueEvent> {
     private ExecutorService m_executor;
     private RingBuffer<ValueEvent> m_ringBuffer;
     private Disruptor<ValueEvent> m_disruptor;
+    
+    private long m_transferMessages;
+    private long m_publishedMessages;
 
     ProtocolProcessor() {}
 
@@ -148,6 +151,16 @@ class ProtocolProcessor implements EventHandler<ValueEvent> {
 
         // Get the ring buffer from the Disruptor to be used for publishing.
         m_ringBuffer = m_disruptor.getRingBuffer();
+        
+        m_transferMessages = 0;
+        m_publishedMessages = 0;
+		m_interceptor.notifyInit(this);
+		
+		List<Subscription> sList = sessionsStore.listAllSubscriptions();
+		for (Subscription s : sList) {
+			LOG.debug("from persistent file: clientId=" + s.getClientId() + " topic=" + s.getTopicFilter());
+			m_interceptor.notifyTopicSubscribed(s);
+		}
     }
 
     void stop() {
@@ -199,12 +212,17 @@ class ProtocolProcessor implements EventHandler<ValueEvent> {
             LOG.info("Found an existing connection with same client ID <{}>, forcing to close", msg.getClientID());
             //clean the subscriptions if the old used a cleanSession = true
             ServerChannel oldSession = m_clientIDs.get(msg.getClientID()).getSession();
+            String clientID = msg.getClientID();
+            
+            Set<Subscription> subsList0 = subscriptions.findAllByClientID(msg.getClientID());
             boolean cleanSession = (Boolean) oldSession.getAttribute(NettyChannel.ATTR_KEY_CLEANSESSION);
             if (cleanSession) {
                 //cleanup topic subscriptions
                 cleanSession(msg.getClientID());
             }
-
+            Set<Subscription> subsList1 = subscriptions.findAllByClientID(msg.getClientID());
+            Set<String> a = Utils.compareSubscriptions(subsList0, subsList1);
+            m_interceptor.notifyClientDisconnected(clientID, a);
             oldSession.close(false);
             LOG.debug("Existing connection with same client ID <{}>, forced to close", msg.getClientID());
         }
@@ -233,13 +251,19 @@ class ProtocolProcessor implements EventHandler<ValueEvent> {
         }
 
         subscriptions.activate(msg.getClientID());
-
+        
+        Set<Subscription> subsList0 = subscriptions.findAllByClientID(msg.getClientID());
         //handle clean session flag
         if (msg.isCleanSession()) {
             //remove all prev subscriptions
             //cleanup topic subscriptions
             cleanSession(msg.getClientID());
         }
+        Set<Subscription> subsList1 = subscriptions.findAllByClientID(msg.getClientID());
+
+        Set<String> a = Utils.compareSubscriptions(subsList0, subsList1);
+        
+        m_interceptor.notifyClientDisconnected(msg.getClientID(), a);
 
         ConnAckMessage okResp = new ConnAckMessage();
         okResp.setReturnCode(ConnAckMessage.CONNECTION_ACCEPTED);
@@ -293,6 +317,7 @@ class ProtocolProcessor implements EventHandler<ValueEvent> {
         int messageID = msg.getMessageID();
         //Remove the message from message store
         m_messagesStore.removeMessageInSession(clientID, messageID);
+        LOG.debug("Remove: clientID=" + clientID + " messageID=" + messageID);
     }
     
     private void cleanSession(String clientID) {
@@ -320,7 +345,7 @@ class ProtocolProcessor implements EventHandler<ValueEvent> {
         }
     }
         
-    private void executePublish(String clientID, PublishMessage msg) {
+    public void executePublish(String clientID, PublishMessage msg) {
         final String topic = msg.getTopicName();
         final AbstractMessage.QOSType qos = msg.getQos();
         final ByteBuffer message = msg.getPayload();
@@ -328,6 +353,8 @@ class ProtocolProcessor implements EventHandler<ValueEvent> {
         final Integer messageID = msg.getMessageID();
         LOG.info("PUBLISH from clientID <{}> on topic <{}> with QoS {}", clientID, topic, qos);
 
+        m_publishedMessages++;
+        
         PublishEvent publishEvt = new PublishEvent(clientID, msg);
         if (qos == AbstractMessage.QOSType.MOST_ONE) { //QoS0
             forward2Subscribers(publishEvt);
@@ -337,13 +364,17 @@ class ProtocolProcessor implements EventHandler<ValueEvent> {
             forward2Subscribers(publishEvt);
             m_messagesStore.cleanInFlight(clientID, messageID);
             //NB the PUB_ACK could be sent also after the addInFlight
-            sendPubAck(new PubAckEvent(messageID, clientID));
+            if (!clientID.equals("mqttpiax")) {
+            	sendPubAck(new PubAckEvent(messageID, clientID));
+            }
             LOG.debug("replying with PubAck to MSG ID {}", messageID);
         }  else if (qos == AbstractMessage.QOSType.EXACTLY_ONCE) { //QoS2
             String publishKey = String.format("%s%d", clientID, messageID);
             //store the message in temp store
             m_messagesStore.persistQoS2Message(publishKey, publishEvt);
-            sendPubRec(clientID, messageID);
+            if (!clientID.equals("mqttpiax")) {
+	            sendPubRec(clientID, messageID);
+            }
             //Next the client will send us a pub rel
             //NB publish to subscribers for QoS 2 happen upon PUBREL from publisher
         }
@@ -395,8 +426,8 @@ class ProtocolProcessor implements EventHandler<ValueEvent> {
                 qos = sub.getRequestedQos();
             }
 
-            LOG.debug("Broker republishing to client <{}> topic <{}> qos <{}>, active {}",
-                    sub.getClientId(), sub.getTopicFilter(), qos, sub.isActive());
+            LOG.debug("Broker republishing to client <{}> topic <{}> qos <{}>, active {}, from {}",
+                    sub.getClientId(), sub.getTopicFilter(), qos, sub.isActive(), pubEvt.getClientID());
             ByteBuffer message = origMessage.duplicate();
             if (qos == AbstractMessage.QOSType.MOST_ONE && sub.isActive()) {
                 //QoS 0
@@ -409,6 +440,7 @@ class ProtocolProcessor implements EventHandler<ValueEvent> {
                     //clone the event with matching clientID
                     PublishEvent newPublishEvt = new PublishEvent(topic, qos, message, retain, sub.getClientId(), messageID != null ? messageID : 0);
                     m_messagesStore.storePublishForFuture(newPublishEvt);
+                    LOG.debug("Store : clientID=" + sub.getClientId() + " topic=" + topic + " messageID=" + messageID);
                 } else  {
                     //TODO also QoS 1 has to be stored in Flight Zone
                     //if QoS 2 then store it in temp memory
@@ -558,22 +590,27 @@ class ProtocolProcessor implements EventHandler<ValueEvent> {
     @MQTTMessage(message = DisconnectMessage.class)
     void processDisconnect(ServerChannel session, DisconnectMessage msg) throws InterruptedException {
         String clientID = (String) session.getAttribute(NettyChannel.ATTR_KEY_CLIENTID);
+
+        Set<Subscription> subsList0 = subscriptions.findAllByClientID(clientID);
         boolean cleanSession = (Boolean) session.getAttribute(NettyChannel.ATTR_KEY_CLEANSESSION);
         if (cleanSession) {
             //cleanup topic subscriptions
             cleanSession(clientID);
         }
-//        m_notifier.disconnect(evt.getSession());
-        m_clientIDs.remove(clientID);
-        session.close(true);
 
         //de-activate the subscriptions for this ClientID
         subscriptions.deactivate(clientID);
         //cleanup the will store
         m_willStore.remove(clientID);
         
+        Set<Subscription> subsList1 = subscriptions.findAllByClientID(clientID);
+        Set<String> a = Utils.compareSubscriptions(subsList0, subsList1);
+        m_interceptor.notifyClientDisconnected(clientID, a);
+
+//      m_notifier.disconnect(evt.getSession());
+		m_clientIDs.remove(clientID);
+		session.close(true);
         LOG.info("DISCONNECT client <{}> with clean session {}", clientID, cleanSession);
-        m_interceptor.notifyClientDisconnected(clientID);
     }
     
     void processConnectionLost(LostConnectionEvent evt) {
@@ -657,10 +694,12 @@ class ProtocolProcessor implements EventHandler<ValueEvent> {
             return false;
         }
         m_sessionsStore.addNewSubscription(newSubscription);
-        subscriptions.add(newSubscription);
+        boolean realAdd = subscriptions.add(newSubscription);
 
         //notify the Observables
-        m_interceptor.notifyTopicSubscribed(newSubscription);
+        if (realAdd) {
+        	m_interceptor.notifyTopicSubscribed(newSubscription);
+        }
 
         //scans retained messages to be published to the new subscription
         Collection<IMessagesStore.StoredMessage> messages = m_messagesStore.searchMatching(new IMatchingCondition() {
@@ -687,7 +726,9 @@ class ProtocolProcessor implements EventHandler<ValueEvent> {
 
         event.setEvent(msgEvent);
         
-        m_ringBuffer.publish(sequence); 
+        m_ringBuffer.publish(sequence);
+        
+        m_transferMessages++;
     }
 
     public void onEvent(ValueEvent t, long l, boolean bln) throws Exception {
@@ -701,5 +742,35 @@ class ProtocolProcessor implements EventHandler<ValueEvent> {
             t.setEvent(null); //free the reference to all Netty stuff
         }
     }
-
+    
+    public Statistics getStatistics() {
+    	Statistics stat = new Statistics(subscriptions.size(), m_messagesStore.size(), m_transferMessages, m_publishedMessages, 0);  
+    	
+    	Map<String, ClientStatistics> tmp = new HashMap<String, ClientStatistics>();
+		for (Subscription s : m_sessionsStore.listAllSubscriptions()) {
+			String cid = s.getClientId();
+			if (!tmp.containsKey(cid)) {
+				ClientStatistics cs = new ClientStatistics();
+				cs.clientID = s.getClientId();
+				cs.subscriptions = s.getTopicFilter();
+				cs.isActive = s.isActive();
+				tmp.put(cid, cs);
+			} else {
+				ClientStatistics cs = tmp.get(cid);
+				cs.subscriptions += ", " + s.getTopicFilter();
+				if (s.isActive())
+					cs.isActive = true;
+			}
+		}
+		
+		for (String key: tmp.keySet()) {
+			stat.clients.add(tmp.get(key));
+		}
+		
+    	return stat;
+    }
+    
+    public int getNextPacketID(String clientId) {
+    	return m_messagesStore.nextPacketID(clientId);
+    }
 }

@@ -116,9 +116,9 @@ public class SubscriptionsStore {
         }
     }
     
-    protected void addDirect(Subscription newSubscription) {
+    protected boolean addDirect(Subscription newSubscription) {
         TreeNode current = findMatchingNode(newSubscription.topicFilter);
-        current.addSubscription(newSubscription);
+        return current.addSubscription(newSubscription);
     }
     
     private TreeNode findMatchingNode(String topic) {
@@ -149,8 +149,8 @@ public class SubscriptionsStore {
         return current;
     }
 
-    public void add(Subscription newSubscription) {
-        addDirect(newSubscription);
+    public boolean add(Subscription newSubscription) {
+        return addDirect(newSubscription);
 
         //log the subscription
 //        String clientID = newSubscription.getClientId();
@@ -187,6 +187,10 @@ public class SubscriptionsStore {
         for (Subscription subscription : allSubscriptions) {
             removeSubscription(subscription.getTopicFilter(), subscription.getClientId());
         }
+    }
+
+    public Set<Subscription> findAllByClientID(String clientID) {
+    	return subscriptions.findAllByClientID(clientID);
     }
 
     /**

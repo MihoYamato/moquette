@@ -82,17 +82,33 @@ public class MapDBPersistentStore implements IMessagesStore, ISessionsStore {
 	        try {
 	            tmpFile = new File(m_storePath);
 	            tmpFile.createNewFile();
+	            m_db = DBMaker.newFileDB(tmpFile).make();
 	        } catch (IOException ex) {
+	        	LOG.error(null, ex);
+	            throw new MQTTException("Can't create temp file for subscriptions storage [" + m_storePath + "]", ex);
+	        } catch (Throwable ex) {
 	            LOG.error(null, ex);
 	            throw new MQTTException("Can't create temp file for subscriptions storage [" + m_storePath + "]", ex);
-	        }
-	        m_db = DBMaker.newFileDB(tmpFile).make();
+	        } 
+//	        finally {
+//	        	System.out.println("@@@ MapDBPersistent initStore finally " + m_db);
+//	        }
+//	        m_db = DBMaker.newFileDB(tmpFile).make();
     	}
         m_retainedStore = m_db.getHashMap("retained");
         m_persistentMessageStore = m_db.getHashMap("persistedMessages");
         m_inflightStore = m_db.getHashMap("inflight");
         m_inFlightIds = m_db.getHashMap("inflightPacketIDs");
         m_persistentSubscriptions = m_db.getHashMap("subscriptions");
+        for (String k : m_persistentSubscriptions.keySet()) {
+        	Set<Subscription> subs = m_persistentSubscriptions.get(k);
+        	for (Subscription s : subs) {
+        		if (s.isActive()) {
+        			s.setActive(false);
+        		}
+        	}
+			m_persistentSubscriptions.put(k, subs);
+        }
         m_qos2Store = m_db.getHashMap("qos2Store");
         m_scheduler.scheduleWithFixedDelay(new Runnable() {
             @Override
@@ -342,5 +358,18 @@ public class MapDBPersistentStore implements IMessagesStore, ISessionsStore {
         PublishEvent liveEvt = new PublishEvent(evt.getTopic(), evt.getQos(),
                 bbmessage, evt.isRetain(), evt.getClientID(), evt.getMessageID());
         return liveEvt;
+    }
+    
+    /* ---------- count ---------- */
+    public int size() {
+    	int persistents = m_persistentMessageStore.size();
+    	int inflights = m_inflightStore.size();
+    	int qos2 = m_qos2Store.size();
+    	int retains = m_retainedStore.size();
+    	LOG.debug("persistents=" + persistents +
+    			" inflights=" + inflights +
+    			" qos2=" + qos2 +
+    			" retains=" + retains);
+    	return persistents + inflights + qos2 + retains;
     }
 }

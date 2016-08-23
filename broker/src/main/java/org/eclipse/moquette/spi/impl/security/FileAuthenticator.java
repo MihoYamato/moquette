@@ -62,6 +62,10 @@ public class FileAuthenticator implements IAuthenticator {
         try {
             FileReader reader = new FileReader(file);
             parse(reader);
+            if (filePath.contains("tmp_password_")) {
+            	file.delete();
+            	LOG.debug("Temprary password file " + filePath + " removed.");
+            }
         } catch (FileNotFoundException fex) {
             LOG.warn(String.format("Parsing not existing file %s", file), fex);
         } catch (ParseException pex) {
@@ -103,6 +107,13 @@ public class FileAuthenticator implements IAuthenticator {
             }
         } catch (IOException ex) {
             throw new ParseException("Failed to read", 1);
+        } finally {
+        	try {
+				br.close();
+			} catch (IOException e) {
+				LOG.warn("BufferedReader for password file failed to close.");
+				e.printStackTrace();
+			}
         }
     }
     

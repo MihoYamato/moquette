@@ -25,7 +25,9 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.*;
@@ -63,6 +65,18 @@ public class BrokerInterceptorTest {
         public void onUnsubscribe(InterceptUnsubscribeMessage msg) {
             n.set(80);
         }
+
+		@Override
+		public void onDisconnect(InterceptDisconnectMessage msg, Set<String> deletedTopics) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void onInit(ProtocolProcessor pp) {
+			// TODO Auto-generated method stub
+			
+		}
     }
 
     private static final BrokerInterceptor interceptor = new BrokerInterceptor(Arrays.<InterceptHandler>asList(new MockObserver()));

@@ -22,7 +22,9 @@ import org.eclipse.moquette.proto.messages.ConnectMessage;
 import org.eclipse.moquette.proto.messages.PublishMessage;
 import org.eclipse.moquette.spi.impl.subscriptions.Subscription;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -58,6 +60,7 @@ final class BrokerInterceptor implements Interceptor {
             });
         }
     }
+
 
     @Override
     public void notifyClientDisconnected(final String clientID) {
@@ -106,4 +109,30 @@ final class BrokerInterceptor implements Interceptor {
             });
         }
     }
+    
+    @Override
+    public void notifyClientDisconnected(final String clientID, final Set<String> deletedTopics) {
+        for (final InterceptHandler handler : this.handlers) {
+            executor.execute(new Runnable() {
+                @Override
+                public void run() {
+                    handler.onDisconnect(new InterceptDisconnectMessage(clientID), deletedTopics);
+                }
+            });
+        }
+    }
+
+	@Override
+	public void notifyInit(final ProtocolProcessor pp) {
+        for (final InterceptHandler handler : this.handlers) {
+            executor.execute(new Runnable() {
+                @Override
+                public void run() {
+                    handler.onInit(pp);
+                }
+            });
+        }
+		
+	}
+
 }

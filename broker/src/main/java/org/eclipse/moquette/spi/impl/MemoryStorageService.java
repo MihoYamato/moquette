@@ -249,4 +249,10 @@ public class MemoryStorageService implements IMessagesStore, ISessionsStore {
     public PublishEvent retrieveQoS2Message(String publishKey) {
         return m_qos2Store.get(publishKey);
     }
+
+	@Override
+	public int size() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
 }

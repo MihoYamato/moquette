@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<jardesc>
+    <jar path="mqtt-on-piax/lib/moquette-broker.jar"/>
+    <options buildIfNeeded="true" compress="true" descriptionLocation="/moquette-broker/moquette-broker.jardesc" exportErrors="false" exportWarnings="true" includeDirectoryEntries="false" overwrite="true" saveDescription="true" storeRefactorings="false" useSourceFolders="true"/>
+    <storedRefactorings deprecationInfo="true" structuralOnly="false"/>
+    <selectedProjects/>
+    <manifest generateManifest="true" manifestLocation="/mqtt-on-piax/MANIFEST.MF" manifestVersion="1.0" reuseManifest="false" saveManifest="true" usesManifest="true">
+        <sealing sealJar="false">
+            <packagesToSeal/>
+            <packagesToUnSeal/>
+        </sealing>
+    </manifest>
+    <selectedElements exportClassFiles="true" exportJavaFiles="false" exportOutputFolder="false">
+        <folder path="/moquette-broker/config"/>
+        <javaElement handleIdentifier="=moquette-broker/src\/main\/java"/>
+        <folder path="/moquette-broker/target/classes"/>
+    </selectedElements>
+</jardesc>

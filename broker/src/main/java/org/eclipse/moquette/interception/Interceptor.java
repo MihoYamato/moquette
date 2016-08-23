@@ -15,8 +15,11 @@
  */
 package org.eclipse.moquette.interception;
 
+import java.util.Set;
+
 import org.eclipse.moquette.proto.messages.ConnectMessage;
 import org.eclipse.moquette.proto.messages.PublishMessage;
+import org.eclipse.moquette.spi.impl.ProtocolProcessor;
 import org.eclipse.moquette.spi.impl.subscriptions.Subscription;
 
 /**
@@ -33,6 +36,8 @@ import org.eclipse.moquette.spi.impl.subscriptions.Subscription;
  * @author Wagner Macedo
  */
 public interface Interceptor {
+	
+	void notifyInit(ProtocolProcessor pp);
 
     void notifyClientConnected(ConnectMessage msg);
 
@@ -44,4 +49,5 @@ public interface Interceptor {
 
     void notifyTopicUnsubscribed(String topic, String clientID);
 
+    void notifyClientDisconnected(String clientID, Set<String> deletedTopics);
 }

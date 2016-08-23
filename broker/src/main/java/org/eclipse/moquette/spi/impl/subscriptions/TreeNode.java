@@ -45,10 +45,10 @@ class TreeNode {
         this.m_token = topic;
     }
 
-    void addSubscription(Subscription s) {
+    boolean addSubscription(Subscription s) {
         //avoid double registering for same clientID, topic and QoS
         if (m_subscriptions.contains(s)) {
-            return;
+            return false;
         }
         //remove existing subscription for same client and topic but different QoS
         Comparator<Subscription> comparator = new ClientIDComparator();
@@ -59,6 +59,7 @@ class TreeNode {
         }
         
         m_subscriptions.add(s);
+        return true;
     }
 
     void addChild(TreeNode child) {

@@ -50,7 +50,14 @@ public class ACLFileParser {
         }
         try {
             FileReader reader = new FileReader(file);
-            return parse(reader);
+            AuthorizationsCollector ac = parse(reader);
+            
+            if (file.getPath().contains("tmp_acl_")) {
+            	file.delete();
+            	LOG.debug("Temporary ACL file " + file.getPath() + " removed.");
+            }
+            return ac;
+
         } catch (FileNotFoundException fex) {
             LOG.warn(String.format("parsing not existing file %s, so fallback on default configuration!", file.getAbsolutePath()), fex);
             return AuthorizationsCollector.emptyImmutableCollector();
@@ -75,15 +82,19 @@ public class ACLFileParser {
 
         try {
             while ((line = br.readLine()) != null) {
-                int commentMarker = line.indexOf('#');
-                if (commentMarker != -1) {
-                    if (commentMarker == 0) {
-                        //skip its a comment
-                        continue;
-                    } else {
-                        //it's a malformed comment
-                        throw new ParseException(line, commentMarker);
-                    }
+//            	int commentMarker = line.indexOf('#'); topicのワイルドカード#が使えなくなってしまう
+//                if (commentMarker != -1) {
+//                    if (commentMarker == 0) {
+//                        //skip its a comment
+//                        continue;
+//                    } else {
+//                        //it's a malformed comment
+//                        throw new ParseException(line, commentMarker);
+//                    }
+            	int commentMarker = line.trim().indexOf(';');
+            	if (commentMarker == 0) {
+            		//skip its a comment
+            		continue;
                 } else {
                     if (line.isEmpty() || line.matches("^\\s*$")) {
                         //skip it's a black line
@@ -95,6 +106,13 @@ public class ACLFileParser {
             }
         } catch (IOException ex) {
             throw new ParseException("Failed to read", 1);
+        } finally {
+        	try {
+				br.close();
+			} catch (IOException e) {
+				LOG.warn("BufferedReader for aclFile failed to close");
+				e.printStackTrace();
+			}
         }
         return collector;
     }
