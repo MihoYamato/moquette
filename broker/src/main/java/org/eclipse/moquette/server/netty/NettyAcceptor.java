@@ -106,7 +106,7 @@ public class NettyAcceptor implements ServerAcceptor {
         m_workerGroup = new NioEventLoopGroup();
         
         initializePlainTCPTransport(messaging, props);
-//        initializeWebSocketTransport(messaging, props);
+        initializeWebSocketTransport(messaging, props);
 //        String sslTcpPortProp = props.getProperty(Constants.SSL_PORT_PROPERTY_NAME);
 //        String wssPortProp = props.getProperty(Constants.WSS_PORT_PROPERTY_NAME);
 //        if (sslTcpPortProp != null || wssPortProp != null) {
