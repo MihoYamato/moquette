@@ -403,6 +403,14 @@ public class ProtocolProcessor implements EventHandler<ValueEvent> {
         PublishEvent pub = new PublishEvent(will.getTopic(), will.getQos(), will.getPayload(), will.isRetained(),
                 clientID, messageId);
         forward2Subscribers(pub);
+
+		// Deliver will message to PIAX network
+		PublishMessage msg= new PublishMessage();
+        msg.setRetainFlag(will.isRetained());
+        msg.setTopicName(will.getTopic());
+        msg.setQos(will.getQos());
+        msg.setPayload(will.getPayload());
+        m_interceptor.notifyTopicPublished(msg, clientID);
     }
 
 
